@@ -506,6 +506,7 @@ class BuscadorAutomatico(ScraperBase):
             "https://worthystream.com/home/",
             "https://originetv.com/",
             "https://zentrotv.net/",
+            "https://centralextv.com/teste/",
         ]
         
         for site in sites_especificos:
