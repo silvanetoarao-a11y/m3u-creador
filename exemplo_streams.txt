@@ -1,0 +1,15 @@
+# Formato: nome|url|categoria|grupo
+# Categorias disponíveis: live, movie, series, adult, open, private
+
+# Exemplo de canais ao vivo
+Globo|http://example.com/globo.m3u8|live|Canais Abertos
+SBT|http://example.com/sbt.m3u8|live|Canais Abertos
+Record|http://example.com/record.m3u8|live|Canais Abertos
+
+# Exemplo de filmes
+Filme 1|http://example.com/filme1.m3u8|movie|Filmes
+Filme 2|http://example.com/filme2.m3u8|movie|Filmes
+
+# Exemplo de séries
+Serie 1|http://example.com/serie1.m3u8|series|Séries
+Serie 2|http://example.com/serie2.m3u8|series|Séries
