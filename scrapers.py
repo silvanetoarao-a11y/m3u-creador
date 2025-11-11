@@ -22,14 +22,21 @@ class ScraperBase:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
     
-    def fazer_requisicao(self, url: str) -> Optional[str]:
+    def fazer_requisicao(self, url: str, silencioso: bool = False) -> Optional[str]:
         """Faz uma requisição HTTP e retorna o conteúdo"""
         try:
             response = requests.get(url, headers=self.headers, timeout=10)
+            if response.status_code == 404:
+                return None  # Não mostrar erro para 404
             response.raise_for_status()
             return response.text
+        except requests.exceptions.HTTPError as e:
+            if not silencioso and e.response.status_code != 404:
+                print(f"Erro HTTP {e.response.status_code} ao acessar {url[:60]}...")
+            return None
         except Exception as e:
-            print(f"Erro ao fazer requisição para {url}: {e}")
+            if not silencioso:
+                print(f"Erro ao acessar {url[:60]}...: {str(e)[:50]}")
             return None
     
     def extrair_urls_m3u(self, texto: str) -> List[str]:
@@ -128,7 +135,7 @@ class BuscadorAutomatico(ScraperBase):
                     for arquivo in arquivos_conhecidos:
                         for branch in branches:
                             url_teste = f"https://raw.githubusercontent.com/{repo}/{branch}/{arquivo}"
-                            if self.fazer_requisicao(url_teste):
+                            if self.fazer_requisicao(url_teste, silencioso=True):
                                 urls_encontradas.append(url_teste)
                                 print(f"  ✓ Encontrado: {arquivo}")
                                 break
@@ -234,29 +241,230 @@ class BuscadorAutomatico(ScraperBase):
         
         return urls_encontradas
     
+    def buscar_em_sites_iptv(self) -> List[str]:
+        """Busca em sites conhecidos de IPTV"""
+        urls_encontradas = []
+        
+        print("Buscando em sites de IPTV...")
+        
+        # Lista de sites conhecidos que podem ter listas M3U
+        sites_iptv = [
+            "https://iptv-org.github.io/iptv/index.m3u",
+            "https://iptv-org.github.io/iptv/countries/br.m3u",
+            "https://iptv-org.github.io/iptv/countries/us.m3u",
+            "https://raw.githubusercontent.com/iptv-org/iptv/master/index.m3u",
+        ]
+        
+        # Sites com listas públicas conhecidas
+        sites_com_listas = [
+            "https://github.com/iptv-org/iptv",
+            "https://github.com/freeiptv/iptv",
+            "https://github.com/EvilCult/iptv-m3u-maker",
+        ]
+        
+        for site in sites_iptv:
+            conteudo = self.fazer_requisicao(site, silencioso=True)
+            if conteudo and '#EXTM3U' in conteudo:
+                urls_encontradas.append(site)
+                print(f"  ✓ Encontrado: {site}")
+        
+        # Buscar links M3U em páginas HTML
+        for site in sites_com_listas:
+            urls = self.buscar_em_paginas_html(site)
+            urls_encontradas.extend(urls)
+            if urls:
+                print(f"  ✓ Encontrados {len(urls)} links em {site}")
+        
+        return urls_encontradas
+    
+    def buscar_em_foruns_comunidades(self) -> List[str]:
+        """Busca em fóruns e comunidades que compartilham listas M3U"""
+        urls_encontradas = []
+        
+        print("Buscando em fóruns e comunidades...")
+        
+        # URLs de fóruns conhecidos (exemplos - podem precisar de ajuste)
+        foruns = [
+            "https://www.reddit.com/r/IPTV/",
+            "https://www.reddit.com/r/iptvresellers/",
+        ]
+        
+        for forum in foruns:
+            try:
+                conteudo = self.fazer_requisicao(forum, silencioso=True)
+                if conteudo:
+                    # Buscar links M3U no conteúdo
+                    urls = self.extrair_urls_m3u(conteudo)
+                    urls_encontradas.extend(urls)
+                    if urls:
+                        print(f"  ✓ Encontrados {len(urls)} links em {forum[:50]}...")
+            except:
+                continue
+        
+        return urls_encontradas
+    
+    def buscar_em_pastebin_servicos(self) -> List[str]:
+        """Busca em serviços de paste como Pastebin"""
+        urls_encontradas = []
+        
+        print("Buscando em serviços de paste...")
+        
+        # Padrões comuns de pastebin
+        pastebin_ids = []
+        
+        # Tentar buscar em pastebin conhecidos (exemplos)
+        pastebin_base = "https://pastebin.com/raw/"
+        
+        # Nota: Para buscar automaticamente, seria necessário usar API ou scraping
+        # Por enquanto, vamos focar em outros métodos
+        
+        return urls_encontradas
+    
+    def buscar_usando_duckduckgo(self) -> List[str]:
+        """Busca URLs M3U usando DuckDuckGo (sem API)"""
+        urls_encontradas = []
+        
+        print("Buscando usando mecanismo de busca...")
+        
+        # DuckDuckGo HTML search
+        termos_busca = [
+            "iptv m3u playlist",
+            "m3u8 playlist free",
+            "iptv m3u github",
+            "free iptv m3u list",
+        ]
+        
+        for termo in termos_busca[:2]:  # Limitar para não sobrecarregar
+            try:
+                # DuckDuckGo search URL
+                search_url = f"https://html.duckduckgo.com/html/?q={termo.replace(' ', '+')}"
+                conteudo = self.fazer_requisicao(search_url, silencioso=True)
+                
+                if conteudo:
+                    soup = BeautifulSoup(conteudo, 'html.parser')
+                    links = soup.find_all('a', href=True)
+                    
+                    for link in links:
+                        href = link.get('href', '')
+                        if href and ('.m3u' in href.lower() or 'm3u8' in href.lower()):
+                            if href.startswith('http'):
+                                urls_encontradas.append(href)
+                                print(f"  ✓ Encontrado: {href[:60]}...")
+            except Exception as e:
+                continue
+        
+        return urls_encontradas
+    
+    def buscar_em_redes_sociais(self) -> List[str]:
+        """Busca em redes sociais e plataformas de compartilhamento"""
+        urls_encontradas = []
+        
+        print("Buscando em redes sociais...")
+        
+        # Telegram channels públicos conhecidos (exemplos)
+        # Nota: Acesso direto ao Telegram requer API, mas podemos buscar links públicos
+        
+        # Buscar em sites que agregam links de Telegram
+        sites_telegram = [
+            "https://t.me/s/iptvbrasil",
+            "https://t.me/s/freeiptv",
+        ]
+        
+        for site in sites_telegram:
+            try:
+                conteudo = self.fazer_requisicao(site, silencioso=True)
+                if conteudo:
+                    urls = self.extrair_urls_m3u(conteudo)
+                    urls_encontradas.extend(urls)
+                    if urls:
+                        print(f"  ✓ Encontrados {len(urls)} links")
+            except:
+                continue
+        
+        return urls_encontradas
+    
+    def buscar_em_servicos_cloud(self) -> List[str]:
+        """Busca em serviços de cloud storage públicos"""
+        urls_encontradas = []
+        
+        print("Buscando em serviços de cloud...")
+        
+        # Google Drive, Dropbox, etc. (links públicos conhecidos)
+        # Nota: Busca automática é limitada, mas podemos tentar padrões conhecidos
+        
+        return urls_encontradas
+    
+    def buscar_em_sites_alternativos(self) -> List[str]:
+        """Busca em sites alternativos que hospedam listas M3U"""
+        urls_encontradas = []
+        
+        print("Buscando em sites alternativos...")
+        
+        # Sites que podem ter listas M3U
+        sites_alternativos = [
+            "https://www.freeintertv.com/view/id-pt",
+            "https://www.freeintertv.com/view/id-br",
+        ]
+        
+        for site in sites_alternativos:
+            try:
+                urls = self.buscar_em_paginas_html(site)
+                urls_encontradas.extend(urls)
+                if urls:
+                    print(f"  ✓ Encontrados {len(urls)} links em {site[:50]}...")
+            except:
+                continue
+        
+        return urls_encontradas
+    
     def buscar_todas_fontes(self) -> List[str]:
-        """Busca automaticamente todas as fontes possíveis"""
+        """Busca automaticamente todas as fontes possíveis na internet"""
         print("=" * 60)
-        print("BUSCA AUTOMÁTICA DE FONTES M3U")
+        print("BUSCA AUTOMÁTICA DE FONTES M3U NA INTERNET")
         print("=" * 60)
         print()
         
         todas_urls = []
         
-        # Buscar em repositórios GitHub
+        # 1. Buscar em repositórios GitHub
         urls_github = self.buscar_repositorios_github()
         todas_urls.extend(urls_github)
         print(f"✓ {len(urls_github)} fontes encontradas no GitHub\n")
         
-        # Buscar em sites conhecidos
+        # 2. Buscar em sites conhecidos de IPTV
+        urls_sites_iptv = self.buscar_em_sites_iptv()
+        todas_urls.extend(urls_sites_iptv)
+        print(f"✓ {len(urls_sites_iptv)} fontes encontradas em sites de IPTV\n")
+        
+        # 3. Buscar em sites conhecidos
         urls_sites = self.buscar_em_sites_conhecidos()
         todas_urls.extend(urls_sites)
         print(f"✓ {len(urls_sites)} fontes encontradas em sites conhecidos\n")
         
-        # Buscar em Gists
+        # 4. Buscar em Gists
         urls_gists = self.buscar_em_pastebin_gist()
         todas_urls.extend(urls_gists)
         print(f"✓ {len(urls_gists)} fontes encontradas em Gists\n")
+        
+        # 5. Buscar em fóruns e comunidades
+        urls_foruns = self.buscar_em_foruns_comunidades()
+        todas_urls.extend(urls_foruns)
+        print(f"✓ {len(urls_foruns)} fontes encontradas em fóruns\n")
+        
+        # 6. Buscar usando mecanismo de busca
+        urls_busca = self.buscar_usando_duckduckgo()
+        todas_urls.extend(urls_busca)
+        print(f"✓ {len(urls_busca)} fontes encontradas via busca\n")
+        
+        # 7. Buscar em redes sociais
+        urls_redes = self.buscar_em_redes_sociais()
+        todas_urls.extend(urls_redes)
+        print(f"✓ {len(urls_redes)} fontes encontradas em redes sociais\n")
+        
+        # 8. Buscar em sites alternativos
+        urls_alternativos = self.buscar_em_sites_alternativos()
+        todas_urls.extend(urls_alternativos)
+        print(f"✓ {len(urls_alternativos)} fontes encontradas em sites alternativos\n")
         
         # Remover duplicatas
         todas_urls = list(set(todas_urls))
@@ -270,7 +478,7 @@ class BuscadorAutomatico(ScraperBase):
     def processar_fonte_automatica(self, url: str, categoria: str = "live") -> List[StreamInfo]:
         """Processa uma fonte M3U automaticamente"""
         streams = []
-        conteudo = self.fazer_requisicao(url)
+        conteudo = self.fazer_requisicao(url, silencioso=True)
         
         if conteudo and ('#EXTM3U' in conteudo or '.m3u' in url.lower()):
             # É um arquivo M3U válido
