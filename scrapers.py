@@ -6,8 +6,12 @@ Módulo de scraping para diferentes fontes web
 
 import re
 import requests
-from typing import List, Optional
+import json
+from typing import List, Optional, Set
+from urllib.parse import urljoin, urlparse
 from gerador_m3u import StreamInfo, GeradorM3U
+from bs4 import BeautifulSoup
+import time
 
 
 class ScraperBase:
@@ -66,6 +70,269 @@ class ScraperBase:
         return nomes
 
 
+class BuscadorAutomatico(ScraperBase):
+    """Classe para buscar automaticamente fontes M3U na web"""
+    
+    def __init__(self):
+        super().__init__()
+        self.fontes_encontradas: Set[str] = set()
+        self.repositorios_github_conhecidos = [
+            "iptv-org/iptv",
+            "freeiptv/iptv",
+            "EvilCult/iptv-m3u-maker",
+            "iptvlist/iptvlist",
+            "m3u-editor/m3u-editor",
+        ]
+        
+        # Padrões de URLs que podem conter listas M3U
+        self.padroes_urls_m3u = [
+            r'https?://[^\s<>"{}|\\^`\[\]]+\.m3u8?',
+            r'https?://[^\s<>"{}|\\^`\[\]]+/playlist\.m3u8?',
+            r'https?://[^\s<>"{}|\\^`\[\]]+/list\.m3u8?',
+            r'https?://[^\s<>"{}|\\^`\[\]]+/iptv\.m3u8?',
+        ]
+    
+    def buscar_repositorios_github(self) -> List[str]:
+        """Busca repositórios GitHub com arquivos M3U"""
+        urls_encontradas = []
+        
+        print("Buscando repositórios GitHub...")
+        for repo in self.repositorios_github_conhecidos:
+            try:
+                # Tentar diferentes branches
+                branches = ['master', 'main', 'gh-pages']
+                encontrado = False
+                
+                for branch in branches:
+                    try:
+                        api_url = f"https://api.github.com/repos/{repo}/git/trees/{branch}?recursive=1"
+                        response = requests.get(api_url, headers=self.headers, timeout=10)
+                        
+                        if response.status_code == 200:
+                            data = response.json()
+                            if 'tree' in data:
+                                for item in data['tree']:
+                                    if item['path'].endswith('.m3u') or item['path'].endswith('.m3u8'):
+                                        raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{item['path']}"
+                                        urls_encontradas.append(raw_url)
+                                        print(f"  ✓ Encontrado: {item['path']}")
+                                encontrado = True
+                                break
+                    except:
+                        continue
+                
+                if not encontrado:
+                    # Tentar buscar diretamente arquivos conhecidos
+                    arquivos_conhecidos = ['streams/br.m3u', 'streams/us.m3u', 'streams/world.m3u', 
+                                          'playlist.m3u', 'list.m3u', 'iptv.m3u']
+                    for arquivo in arquivos_conhecidos:
+                        for branch in branches:
+                            url_teste = f"https://raw.githubusercontent.com/{repo}/{branch}/{arquivo}"
+                            if self.fazer_requisicao(url_teste):
+                                urls_encontradas.append(url_teste)
+                                print(f"  ✓ Encontrado: {arquivo}")
+                                break
+            except Exception as e:
+                print(f"  ✗ Erro ao buscar {repo}: {e}")
+        
+        return urls_encontradas
+    
+    def buscar_em_sites_conhecidos(self) -> List[str]:
+        """Busca em sites conhecidos que hospedam listas M3U"""
+        urls_encontradas = []
+        
+        # Lista de sites conhecidos com listas M3U públicas
+        sites_base = [
+            "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/",
+            "https://iptv-org.github.io/iptv/",
+        ]
+        
+        print("Buscando em sites conhecidos...")
+        for site_base in sites_base:
+            try:
+                conteudo = self.fazer_requisicao(site_base)
+                if conteudo:
+                    # Extrair links M3U da página
+                    soup = BeautifulSoup(conteudo, 'html.parser')
+                    links = soup.find_all('a', href=True)
+                    
+                    for link in links:
+                        href = link['href']
+                        if href.endswith('.m3u') or href.endswith('.m3u8'):
+                            url_completa = urljoin(site_base, href)
+                            urls_encontradas.append(url_completa)
+                            print(f"  ✓ Encontrado: {href}")
+            except Exception as e:
+                print(f"  ✗ Erro ao buscar em {site_base}: {e}")
+        
+        return urls_encontradas
+    
+    def buscar_em_paginas_html(self, url: str) -> List[str]:
+        """Busca links M3U em uma página HTML"""
+        urls_encontradas = []
+        conteudo = self.fazer_requisicao(url)
+        
+        if conteudo:
+            try:
+                soup = BeautifulSoup(conteudo, 'html.parser')
+                
+                # Buscar links diretos
+                links = soup.find_all('a', href=True)
+                for link in links:
+                    href = link['href']
+                    if href.endswith('.m3u') or href.endswith('.m3u8'):
+                        url_completa = urljoin(url, href)
+                        urls_encontradas.append(url_completa)
+                
+                # Buscar em tags script e outros elementos
+                textos = soup.find_all(string=True)
+                for texto in textos:
+                    for padrao in self.padroes_urls_m3u:
+                        matches = re.findall(padrao, texto, re.IGNORECASE)
+                        urls_encontradas.extend(matches)
+                
+                # Buscar em atributos data-*
+                elementos = soup.find_all(attrs=lambda x: x and any('m3u' in str(v).lower() for v in (x.values() if isinstance(x, dict) else [])))
+                for elem in elementos:
+                    for attr, value in elem.attrs.items():
+                        if isinstance(value, str) and ('.m3u' in value.lower() or 'm3u' in value.lower()):
+                            if value.startswith('http'):
+                                urls_encontradas.append(value)
+                            else:
+                                urls_encontradas.append(urljoin(url, value))
+            except Exception as e:
+                print(f"  ✗ Erro ao processar HTML: {e}")
+        
+        return list(set(urls_encontradas))  # Remove duplicatas
+    
+    def buscar_em_pastebin_gist(self) -> List[str]:
+        """Busca em serviços de paste como Pastebin e Gist"""
+        urls_encontradas = []
+        
+        # Buscar em Gists públicos relacionados a IPTV/M3U
+        print("Buscando em Gists públicos...")
+        try:
+            # API do GitHub para buscar gists com termos relacionados
+            search_url = "https://api.github.com/search/code"
+            params = {
+                'q': 'extension:m3u OR extension:m3u8',
+                'sort': 'updated',
+                'order': 'desc'
+            }
+            response = requests.get(search_url, params=params, headers=self.headers, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'items' in data:
+                    for item in data['items'][:10]:  # Limitar a 10 resultados
+                        if 'html_url' in item:
+                            raw_url = item['html_url'].replace('/blob/', '/raw/')
+                            urls_encontradas.append(raw_url)
+                            print(f"  ✓ Encontrado Gist: {item.get('name', 'N/A')}")
+        except Exception as e:
+            print(f"  ✗ Erro ao buscar Gists: {e}")
+        
+        return urls_encontradas
+    
+    def buscar_todas_fontes(self) -> List[str]:
+        """Busca automaticamente todas as fontes possíveis"""
+        print("=" * 60)
+        print("BUSCA AUTOMÁTICA DE FONTES M3U")
+        print("=" * 60)
+        print()
+        
+        todas_urls = []
+        
+        # Buscar em repositórios GitHub
+        urls_github = self.buscar_repositorios_github()
+        todas_urls.extend(urls_github)
+        print(f"✓ {len(urls_github)} fontes encontradas no GitHub\n")
+        
+        # Buscar em sites conhecidos
+        urls_sites = self.buscar_em_sites_conhecidos()
+        todas_urls.extend(urls_sites)
+        print(f"✓ {len(urls_sites)} fontes encontradas em sites conhecidos\n")
+        
+        # Buscar em Gists
+        urls_gists = self.buscar_em_pastebin_gist()
+        todas_urls.extend(urls_gists)
+        print(f"✓ {len(urls_gists)} fontes encontradas em Gists\n")
+        
+        # Remover duplicatas
+        todas_urls = list(set(todas_urls))
+        
+        print(f"Total de fontes únicas encontradas: {len(todas_urls)}")
+        print("=" * 60)
+        print()
+        
+        return todas_urls
+    
+    def processar_fonte_automatica(self, url: str, categoria: str = "live") -> List[StreamInfo]:
+        """Processa uma fonte M3U automaticamente"""
+        streams = []
+        conteudo = self.fazer_requisicao(url)
+        
+        if conteudo and ('#EXTM3U' in conteudo or '.m3u' in url.lower()):
+            # É um arquivo M3U válido
+            linhas = conteudo.split('\n')
+            nome_atual = ""
+            url_atual = ""
+            grupo_atual = ""
+            logo_atual = ""
+            
+            for linha in linhas:
+                linha = linha.strip()
+                
+                if linha.startswith('#EXTINF'):
+                    nome_match = re.search(r',(.+?)$', linha)
+                    if nome_match:
+                        nome_atual = nome_match.group(1)
+                    
+                    grupo_match = re.search(r'group-title="([^"]+)"', linha)
+                    if grupo_match:
+                        grupo_atual = grupo_match.group(1)
+                    
+                    logo_match = re.search(r'tvg-logo="([^"]+)"', linha)
+                    if logo_match:
+                        logo_atual = logo_match.group(1)
+                
+                elif linha and not linha.startswith('#'):
+                    url_atual = linha
+                    if nome_atual and url_atual:
+                        # Determinar categoria baseada no grupo ou nome
+                        cat = self.determinar_categoria(nome_atual, grupo_atual, categoria)
+                        
+                        stream = StreamInfo(
+                            nome=nome_atual,
+                            url=url_atual,
+                            categoria=cat,
+                            grupo=grupo_atual,
+                            logo=logo_atual
+                        )
+                        streams.append(stream)
+                        nome_atual = ""
+                        url_atual = ""
+        
+        return streams
+    
+    def determinar_categoria(self, nome: str, grupo: str, padrao: str = "live") -> str:
+        """Determina a categoria baseada no nome e grupo"""
+        texto = f"{nome} {grupo}".lower()
+        
+        if any(palavra in texto for palavra in ['movie', 'filme', 'cinema', 'film']):
+            return "movie"
+        elif any(palavra in texto for palavra in ['series', 'serie', 'tv show', 'show']):
+            return "series"
+        elif any(palavra in texto for palavra in ['adult', 'xxx', '18+', 'adulto']):
+            return "adult"
+        elif any(palavra in texto for palavra in ['open', 'aberto', 'free', 'gratis']):
+            return "open"
+        elif any(palavra in texto for palavra in ['private', 'privado', 'premium', 'paid']):
+            return "private"
+        else:
+            return padrao
+
+
 class ScraperM3UPublico(ScraperBase):
     """Scraper para listas M3U públicas"""
     
@@ -75,6 +342,10 @@ class ScraperM3UPublico(ScraperBase):
             "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/br.m3u",
             "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/us.m3u",
             "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/world.m3u",
+            "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/mx.m3u",
+            "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/es.m3u",
+            "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/pt.m3u",
+            "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/ar.m3u",
         ]
     
     def buscar_streams(self, categoria: str = "live") -> List[StreamInfo]:

@@ -7,7 +7,7 @@ Programa principal para gerar arquivos M3U
 import argparse
 import os
 from gerador_m3u import GeradorM3U, StreamInfo
-from scrapers import ScraperM3UPublico, ScraperGenerico, ScraperPersonalizado
+from scrapers import ScraperM3UPublico, ScraperGenerico, ScraperPersonalizado, BuscadorAutomatico
 
 
 def main():
@@ -16,8 +16,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Exemplos de uso:
-  python main.py --completo
-  python main.py --categoria live
+  python main.py --completo                    # Busca automática completa
+  python main.py --auto --completo             # Modo automático explícito
+  python main.py --auto --limite 10            # Limitar a 10 fontes
+  python main.py --categoria live              # Filtrar por categoria
   python main.py --categoria movie --arquivo filmes.m3u
   python main.py --fonte-publica --categoria open
   python main.py --arquivo-entrada streams.txt
@@ -48,6 +50,12 @@ Exemplos de uso:
     parser.add_argument('--validar', action='store_true',
                        help='Valida URLs antes de adicionar ao M3U')
     
+    parser.add_argument('--auto', action='store_true',
+                       help='Busca automaticamente fontes M3U na web (modo automático)')
+    
+    parser.add_argument('--limite', type=int, default=0,
+                       help='Limite de fontes a processar (0 = sem limite)')
+    
     args = parser.parse_args()
     
     gerador = GeradorM3U()
@@ -57,8 +65,41 @@ Exemplos de uso:
     print("=" * 60)
     print()
     
+    # Modo automático - busca tudo automaticamente
+    if args.auto:
+        print("MODO AUTOMÁTICO ATIVADO")
+        print("Buscando fontes M3U automaticamente na web...")
+        print()
+        
+        buscador = BuscadorAutomatico()
+        todas_fontes = buscador.buscar_todas_fontes()
+        
+        # Aplicar limite se especificado
+        if args.limite > 0:
+            todas_fontes = todas_fontes[:args.limite]
+            print(f"Limitando a {args.limite} fontes\n")
+        
+        print(f"Processando {len(todas_fontes)} fontes encontradas...")
+        print()
+        
+        categoria = args.categoria or "live"
+        todos_streams = []
+        
+        for i, fonte_url in enumerate(todas_fontes, 1):
+            print(f"[{i}/{len(todas_fontes)}] Processando: {fonte_url[:70]}...")
+            try:
+                streams = buscador.processar_fonte_automatica(fonte_url, categoria)
+                todos_streams.extend(streams)
+                if streams:
+                    print(f"  ✓ {len(streams)} streams adicionados")
+            except Exception as e:
+                print(f"  ✗ Erro: {str(e)[:50]}")
+        
+        gerador.adicionar_streams(todos_streams)
+        print(f"\n✓ Total de {len(todos_streams)} streams coletados")
+    
     # Buscar streams de diferentes fontes
-    if args.fonte_publica:
+    elif args.fonte_publica:
         print("Buscando streams de fontes públicas...")
         scraper_publico = ScraperM3UPublico()
         streams = scraper_publico.buscar_streams(categoria=args.categoria or "live")
@@ -76,12 +117,32 @@ Exemplos de uso:
         streams = ScraperPersonalizado.criar_streams_de_arquivo(args.arquivo_entrada)
         gerador.adicionar_streams(streams)
     
-    # Se nenhuma fonte foi especificada, usar fontes públicas por padrão
-    if not args.fonte_publica and not args.url_site and not args.arquivo_entrada:
-        print("Usando fontes públicas por padrão...")
-        scraper_publico = ScraperM3UPublico()
-        streams = scraper_publico.buscar_streams()
-        gerador.adicionar_streams(streams)
+    # Se nenhuma fonte foi especificada, usar modo automático por padrão
+    if not args.auto and not args.fonte_publica and not args.url_site and not args.arquivo_entrada:
+        print("Nenhuma fonte especificada. Usando modo automático...")
+        print("(Use --auto para busca automática explícita)")
+        print()
+        
+        buscador = BuscadorAutomatico()
+        todas_fontes = buscador.buscar_todas_fontes()
+        
+        if args.limite > 0:
+            todas_fontes = todas_fontes[:args.limite]
+        
+        categoria = args.categoria or "live"
+        todos_streams = []
+        
+        for i, fonte_url in enumerate(todas_fontes[:20], 1):  # Limitar a 20 por padrão
+            print(f"[{i}/{min(20, len(todas_fontes))}] Processando: {fonte_url[:70]}...")
+            try:
+                streams = buscador.processar_fonte_automatica(fonte_url, categoria)
+                todos_streams.extend(streams)
+                if streams:
+                    print(f"  ✓ {len(streams)} streams")
+            except Exception as e:
+                print(f"  ✗ Erro: {str(e)[:50]}")
+        
+        gerador.adicionar_streams(todos_streams)
     
     # Validar URLs se solicitado
     if args.validar:

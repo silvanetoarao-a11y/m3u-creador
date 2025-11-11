@@ -4,13 +4,17 @@ Programa em Python para criar arquivos M3U (playlists de streaming) a partir de 
 
 ## Características
 
-- ✅ Busca streams de fontes públicas M3U
-- ✅ Scraping de sites web para encontrar streams
+- ✅ **BUSCA AUTOMÁTICA** - Encontra fontes M3U automaticamente na web
+- ✅ Busca em repositórios GitHub conhecidos
+- ✅ Busca em sites públicos de IPTV
+- ✅ Busca em Gists e serviços de paste
+- ✅ Scraping inteligente de páginas HTML
 - ✅ Suporte para múltiplas categorias (live, movie, series, adult, open, private)
 - ✅ Geração de arquivos M3U separados por categoria
 - ✅ Validação de URLs
 - ✅ Carregamento de streams de arquivos de texto
 - ✅ Formato M3U padrão compatível com players IPTV
+- ✅ Detecção automática de categorias baseada em nomes e grupos
 
 ## Instalação
 
@@ -23,9 +27,27 @@ pip install -r requirements.txt
 
 ## Uso
 
+### Modo Automático (RECOMENDADO)
+
+O programa agora busca automaticamente fontes M3U na web sem precisar especificar links manualmente!
+
+```bash
+# Busca automática completa (padrão)
+python main.py --completo
+
+# Ou explicitamente
+python main.py --auto --completo
+```
+
+O modo automático busca em:
+- ✅ Repositórios GitHub conhecidos com listas M3U
+- ✅ Sites públicos de IPTV
+- ✅ Gists públicos do GitHub
+- ✅ Páginas HTML com links M3U
+
 ### Uso Básico
 
-Gerar um arquivo M3U completo usando fontes públicas:
+Gerar um arquivo M3U completo usando busca automática:
 
 ```bash
 python main.py --completo
@@ -86,12 +108,20 @@ Isso criará arquivos como:
 - `playlist_series.m3u`
 - etc.
 
+### Modo Automático com Limite
+
+Limitar o número de fontes processadas:
+
+```bash
+python main.py --auto --limite 10 --completo
+```
+
 ### Validar URLs
 
 Validar todas as URLs antes de adicionar ao M3U:
 
 ```bash
-python main.py --fonte-publica --validar
+python main.py --auto --validar --completo
 ```
 
 ## Estrutura do Projeto
