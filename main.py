@@ -17,6 +17,7 @@ def main():
         epilog="""
 Exemplos de uso:
   python main.py --completo                    # Busca automática completa
+  python main.py --link-unico "URL" --completo # Baixa apenas um link específico
   python main.py --auto --completo             # Modo automático explícito
   python main.py --auto --limite 10            # Limitar a 10 fontes
   python main.py --categoria live              # Filtrar por categoria
@@ -56,6 +57,9 @@ Exemplos de uso:
     parser.add_argument('--limite', type=int, default=0,
                        help='Limite de fontes a processar (0 = sem limite)')
     
+    parser.add_argument('--link-unico', type=str,
+                       help='Baixa apenas este link específico (ignora todas outras fontes)')
+    
     args = parser.parse_args()
     
     gerador = GeradorM3U()
@@ -65,8 +69,30 @@ Exemplos de uso:
     print("=" * 60)
     print()
     
+    # Modo link único - processa apenas o link especificado
+    if args.link_unico:
+        print("MODO LINK ÚNICO ATIVADO")
+        print(f"Processando apenas: {args.link_unico}")
+        print()
+        
+        buscador = BuscadorAutomatico()
+        categoria = args.categoria or "live"
+        
+        print(f"Baixando e processando link...")
+        streams = buscador.processar_fonte_automatica(args.link_unico, categoria)
+        gerador.adicionar_streams(streams)
+        
+        print(f"\n✓ {len(streams)} streams processados do link único")
+        
+        # Remover duplicatas
+        total_antes = len(gerador.streams)
+        gerador.remover_duplicatas_streams()
+        total_depois = len(gerador.streams)
+        if total_antes != total_depois:
+            print(f"✓ {total_depois} streams únicos (removidos {total_antes - total_depois} duplicatas)")
+    
     # Modo automático - busca tudo automaticamente
-    if args.auto:
+    elif args.auto:
         print("MODO AUTOMÁTICO ATIVADO")
         print("Buscando fontes M3U automaticamente na web...")
         print()
@@ -104,27 +130,28 @@ Exemplos de uso:
         total_depois = len(gerador.streams)
         print(f"✓ {total_depois} streams únicos (removidos {total_antes - total_depois} duplicatas)")
     
-    # Buscar streams de diferentes fontes
-    elif args.fonte_publica:
-        print("Buscando streams de fontes públicas...")
-        scraper_publico = ScraperM3UPublico()
-        streams = scraper_publico.buscar_streams(categoria=args.categoria or "live")
-        gerador.adicionar_streams(streams)
-    
-    if args.url_site:
-        print(f"Fazendo scraping de {args.url_site}...")
-        scraper = ScraperGenerico()
-        categoria = args.categoria or "live"
-        streams = scraper.buscar_streams_de_site(args.url_site, categoria)
-        gerador.adicionar_streams(streams)
-    
-    if args.arquivo_entrada:
-        print(f"Carregando streams de {args.arquivo_entrada}...")
-        streams = ScraperPersonalizado.criar_streams_de_arquivo(args.arquivo_entrada)
-        gerador.adicionar_streams(streams)
+    # Buscar streams de diferentes fontes (apenas se não estiver usando link único)
+    elif not args.link_unico:
+        if args.fonte_publica:
+            print("Buscando streams de fontes públicas...")
+            scraper_publico = ScraperM3UPublico()
+            streams = scraper_publico.buscar_streams(categoria=args.categoria or "live")
+            gerador.adicionar_streams(streams)
+        
+        if args.url_site:
+            print(f"Fazendo scraping de {args.url_site}...")
+            scraper = ScraperGenerico()
+            categoria = args.categoria or "live"
+            streams = scraper.buscar_streams_de_site(args.url_site, categoria)
+            gerador.adicionar_streams(streams)
+        
+        if args.arquivo_entrada:
+            print(f"Carregando streams de {args.arquivo_entrada}...")
+            streams = ScraperPersonalizado.criar_streams_de_arquivo(args.arquivo_entrada)
+            gerador.adicionar_streams(streams)
     
     # Se nenhuma fonte foi especificada, usar modo automático por padrão
-    if not args.auto and not args.fonte_publica and not args.url_site and not args.arquivo_entrada:
+    if not args.link_unico and not args.auto and not args.fonte_publica and not args.url_site and not args.arquivo_entrada:
         print("Nenhuma fonte especificada. Usando modo automático...")
         print("(Use --auto para busca automática explícita)")
         print()

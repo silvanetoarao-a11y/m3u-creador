@@ -147,6 +147,16 @@ python main.py --categoria adult --arquivo adultos.m3u
 python main.py --categoria private --arquivo privados.m3u
 ```
 
+### Buscar Apenas um Link Específico
+
+Para baixar apenas um link específico (ignora todas outras fontes):
+
+```bash
+python main.py --link-unico "http://dns.play-tv.live//get.php?username=685544881&password=988729441" --completo
+```
+
+Isso processará apenas o link fornecido e ignorará todas as outras fontes de busca.
+
 ### Validar URLs
 
 Validar todas as URLs antes de adicionar ao M3U:
