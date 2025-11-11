@@ -6,10 +6,14 @@ Programa em Python para criar arquivos M3U (playlists de streaming) a partir de 
 
 - ✅ **BUSCA AUTOMÁTICA** - Encontra fontes M3U automaticamente na internet
 - ✅ Busca em múltiplas fontes: GitHub, sites IPTV, fóruns, redes sociais
-- ✅ Busca usando mecanismos de busca (DuckDuckGo)
+- ✅ **Busca em sites privados/premium de IPTV**
+- ✅ **Busca específica por canais adultos**
+- ✅ **Busca por canais de TV/IPTV**
+- ✅ Busca usando mecanismos de busca (DuckDuckGo) - 5+ termos de busca
 - ✅ Scraping inteligente de páginas HTML
 - ✅ Tratamento silencioso de erros (não mostra 404 desnecessários)
 - ✅ Suporte para múltiplas categorias (live, movie, series, adult, open, private)
+- ✅ Detecção automática melhorada de categorias (adulto, privado, TV, etc.)
 - ✅ Geração de arquivos M3U separados por categoria
 - ✅ Validação de URLs
 - ✅ Carregamento de streams de arquivos de texto
@@ -48,6 +52,9 @@ O modo automático busca em:
 - ✅ Mecanismos de busca (DuckDuckGo)
 - ✅ Redes sociais (Telegram, etc.)
 - ✅ Sites alternativos de streaming
+- ✅ **Sites privados/premium de IPTV**
+- ✅ **Canais adultos especificamente**
+- ✅ **Canais de TV/IPTV**
 
 ### Uso Básico
 
@@ -118,6 +125,24 @@ Limitar o número de fontes processadas:
 
 ```bash
 python main.py --auto --limite 10 --completo
+```
+
+### Buscar Canais Específicos
+
+O programa agora busca automaticamente:
+- **Sites privados/premium**: Busca em serviços pagos e privados de IPTV
+- **Canais adultos**: Busca específica por conteúdo adulto (18+)
+- **Canais de TV**: Busca focada em canais de televisão/IPTV
+
+```bash
+# Busca completa incluindo tudo
+python main.py --completo
+
+# Filtrar apenas canais adultos
+python main.py --categoria adult --arquivo adultos.m3u
+
+# Filtrar apenas canais privados
+python main.py --categoria private --arquivo privados.m3u
 ```
 
 ### Validar URLs

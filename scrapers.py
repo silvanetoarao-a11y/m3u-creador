@@ -326,15 +326,21 @@ class BuscadorAutomatico(ScraperBase):
         
         print("Buscando usando mecanismo de busca...")
         
-        # DuckDuckGo HTML search
+        # DuckDuckGo HTML search - termos expandidos
         termos_busca = [
             "iptv m3u playlist",
             "m3u8 playlist free",
             "iptv m3u github",
             "free iptv m3u list",
+            "iptv m3u adult",
+            "iptv m3u premium",
+            "iptv m3u private",
+            "m3u8 tv channels",
+            "iptv m3u brasil",
+            "iptv m3u canais",
         ]
         
-        for termo in termos_busca[:2]:  # Limitar para não sobrecarregar
+        for termo in termos_busca[:5]:  # Aumentar para 5 termos
             try:
                 # DuckDuckGo search URL
                 search_url = f"https://html.duckduckgo.com/html/?q={termo.replace(' ', '+')}"
@@ -350,6 +356,134 @@ class BuscadorAutomatico(ScraperBase):
                             if href.startswith('http'):
                                 urls_encontradas.append(href)
                                 print(f"  ✓ Encontrado: {href[:60]}...")
+            except Exception as e:
+                continue
+        
+        return urls_encontradas
+    
+    def buscar_sites_privados(self) -> List[str]:
+        """Busca em sites privados/premium de IPTV"""
+        urls_encontradas = []
+        
+        print("Buscando em sites privados/premium...")
+        
+        # Termos de busca para sites privados
+        termos_privados = [
+            "iptv premium m3u",
+            "iptv private m3u",
+            "iptv paid m3u",
+            "premium iptv playlist",
+            "private iptv m3u8",
+        ]
+        
+        for termo in termos_privados:
+            try:
+                search_url = f"https://html.duckduckgo.com/html/?q={termo.replace(' ', '+')}"
+                conteudo = self.fazer_requisicao(search_url, silencioso=True)
+                
+                if conteudo:
+                    soup = BeautifulSoup(conteudo, 'html.parser')
+                    links = soup.find_all('a', href=True)
+                    
+                    for link in links:
+                        href = link.get('href', '')
+                        if href and ('.m3u' in href.lower() or 'm3u8' in href.lower() or 'iptv' in href.lower()):
+                            if href.startswith('http'):
+                                urls_encontradas.append(href)
+                                print(f"  ✓ Encontrado site privado: {href[:60]}...")
+                    
+                    # Também buscar links M3U no conteúdo da página
+                    urls_m3u = self.extrair_urls_m3u(conteudo)
+                    urls_encontradas.extend(urls_m3u)
+            except Exception as e:
+                continue
+        
+        return urls_encontradas
+    
+    def buscar_canais_adultos(self) -> List[str]:
+        """Busca especificamente por canais adultos"""
+        urls_encontradas = []
+        
+        print("Buscando canais adultos...")
+        
+        # Termos de busca para conteúdo adulto
+        termos_adultos = [
+            "iptv adult m3u",
+            "iptv xxx m3u",
+            "adult iptv playlist",
+            "iptv 18+ m3u8",
+            "adult tv m3u",
+            "iptv adulto m3u",
+        ]
+        
+        for termo in termos_adultos:
+            try:
+                search_url = f"https://html.duckduckgo.com/html/?q={termo.replace(' ', '+')}"
+                conteudo = self.fazer_requisicao(search_url, silencioso=True)
+                
+                if conteudo:
+                    soup = BeautifulSoup(conteudo, 'html.parser')
+                    links = soup.find_all('a', href=True)
+                    
+                    for link in links:
+                        href = link.get('href', '')
+                        texto_link = link.get_text().lower()
+                        # Verificar se é relacionado a adulto
+                        if (href and ('.m3u' in href.lower() or 'm3u8' in href.lower() or 'iptv' in href.lower()) and
+                            any(palavra in texto_link.lower() or palavra in href.lower() 
+                                for palavra in ['adult', 'xxx', '18+', 'adulto', 'erotic'])):
+                            if href.startswith('http'):
+                                urls_encontradas.append(href)
+                                print(f"  ✓ Encontrado canal adulto: {href[:60]}...")
+                    
+                    # Buscar URLs M3U no conteúdo
+                    urls_m3u = self.extrair_urls_m3u(conteudo)
+                    for url in urls_m3u:
+                        if any(palavra in url.lower() for palavra in ['adult', 'xxx', '18+', 'adulto']):
+                            urls_encontradas.append(url)
+                            print(f"  ✓ Encontrado: {url[:60]}...")
+            except Exception as e:
+                continue
+        
+        return urls_encontradas
+    
+    def buscar_canais_tv_iptv(self) -> List[str]:
+        """Busca especificamente por canais de TV/IPTV"""
+        urls_encontradas = []
+        
+        print("Buscando canais de TV/IPTV...")
+        
+        # Termos de busca para canais de TV
+        termos_tv = [
+            "iptv tv channels m3u",
+            "iptv canais tv m3u",
+            "iptv television m3u8",
+            "iptv live tv m3u",
+            "iptv channels list m3u",
+            "iptv brasil canais m3u",
+            "iptv canais abertos m3u",
+            "iptv canais fechados m3u",
+        ]
+        
+        for termo in termos_tv:
+            try:
+                search_url = f"https://html.duckduckgo.com/html/?q={termo.replace(' ', '+')}"
+                conteudo = self.fazer_requisicao(search_url, silencioso=True)
+                
+                if conteudo:
+                    soup = BeautifulSoup(conteudo, 'html.parser')
+                    links = soup.find_all('a', href=True)
+                    
+                    for link in links:
+                        href = link.get('href', '')
+                        if href and ('.m3u' in href.lower() or 'm3u8' in href.lower() or 'iptv' in href.lower()):
+                            if href.startswith('http'):
+                                urls_encontradas.append(href)
+                                print(f"  ✓ Encontrado canal TV: {href[:60]}...")
+                    
+                    # Buscar URLs M3U no conteúdo
+                    urls_m3u = self.extrair_urls_m3u(conteudo)
+                    urls_encontradas.extend(urls_m3u)
             except Exception as e:
                 continue
         
@@ -466,6 +600,21 @@ class BuscadorAutomatico(ScraperBase):
         todas_urls.extend(urls_alternativos)
         print(f"✓ {len(urls_alternativos)} fontes encontradas em sites alternativos\n")
         
+        # 9. Buscar em sites privados/premium
+        urls_privados = self.buscar_sites_privados()
+        todas_urls.extend(urls_privados)
+        print(f"✓ {len(urls_privados)} fontes encontradas em sites privados\n")
+        
+        # 10. Buscar canais adultos especificamente
+        urls_adultos = self.buscar_canais_adultos()
+        todas_urls.extend(urls_adultos)
+        print(f"✓ {len(urls_adultos)} fontes de canais adultos encontradas\n")
+        
+        # 11. Buscar canais de TV/IPTV
+        urls_tv = self.buscar_canais_tv_iptv()
+        todas_urls.extend(urls_tv)
+        print(f"✓ {len(urls_tv)} fontes de canais TV encontradas\n")
+        
         # Remover duplicatas
         todas_urls = list(set(todas_urls))
         
@@ -488,6 +637,15 @@ class BuscadorAutomatico(ScraperBase):
             grupo_atual = ""
             logo_atual = ""
             
+            # Detectar categoria baseada na URL se não especificada
+            categoria_detectada = categoria
+            if categoria == "live":
+                url_lower = url.lower()
+                if any(palavra in url_lower for palavra in ['adult', 'xxx', '18+', 'adulto', 'erotic']):
+                    categoria_detectada = "adult"
+                elif any(palavra in url_lower for palavra in ['private', 'privado', 'premium', 'paid']):
+                    categoria_detectada = "private"
+            
             for linha in linhas:
                 linha = linha.strip()
                 
@@ -508,7 +666,7 @@ class BuscadorAutomatico(ScraperBase):
                     url_atual = linha
                     if nome_atual and url_atual:
                         # Determinar categoria baseada no grupo ou nome
-                        cat = self.determinar_categoria(nome_atual, grupo_atual, categoria)
+                        cat = self.determinar_categoria(nome_atual, grupo_atual, categoria_detectada)
                         
                         stream = StreamInfo(
                             nome=nome_atual,
@@ -527,16 +685,19 @@ class BuscadorAutomatico(ScraperBase):
         """Determina a categoria baseada no nome e grupo"""
         texto = f"{nome} {grupo}".lower()
         
-        if any(palavra in texto for palavra in ['movie', 'filme', 'cinema', 'film']):
+        # Detecção melhorada de categorias
+        if any(palavra in texto for palavra in ['movie', 'filme', 'cinema', 'film', 'movies']):
             return "movie"
-        elif any(palavra in texto for palavra in ['series', 'serie', 'tv show', 'show']):
+        elif any(palavra in texto for palavra in ['series', 'serie', 'tv show', 'show', 'série']):
             return "series"
-        elif any(palavra in texto for palavra in ['adult', 'xxx', '18+', 'adulto']):
+        elif any(palavra in texto for palavra in ['adult', 'xxx', '18+', 'adulto', 'erotic', 'porn', 'sex']):
             return "adult"
-        elif any(palavra in texto for palavra in ['open', 'aberto', 'free', 'gratis']):
+        elif any(palavra in texto for palavra in ['open', 'aberto', 'free', 'gratis', 'livre']):
             return "open"
-        elif any(palavra in texto for palavra in ['private', 'privado', 'premium', 'paid']):
+        elif any(palavra in texto for palavra in ['private', 'privado', 'premium', 'paid', 'pago', 'subscription']):
             return "private"
+        elif any(palavra in texto for palavra in ['tv', 'television', 'canal', 'channel', 'live', 'ao vivo']):
+            return "live"
         else:
             return padrao
 
