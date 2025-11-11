@@ -1,0 +1,45 @@
+{
+  "fontes_web": {
+    "descricao": "Configure aqui suas fontes web para extração de streams",
+    "exemplos": [
+      "https://exemplo.com/canais",
+      "https://exemplo.com/filmes",
+      "https://exemplo.com/series"
+    ]
+  },
+  
+  "seletores_personalizados": {
+    "descricao": "Seletores CSS para sites específicos",
+    "exemplo_site_1": {
+      "url": "https://exemplo.com",
+      "container": ".canal-item",
+      "nome": ".canal-nome",
+      "url": "a.link-stream",
+      "logo": "img.canal-logo"
+    }
+  },
+  
+  "configuracoes": {
+    "timeout_requisicao": 10,
+    "delay_entre_requisicoes": 1,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "max_tentativas": 3
+  },
+  
+  "categorias": {
+    "tv_aberta": ["Globo", "SBT", "Record", "Band", "RedeTV"],
+    "noticias": ["GloboNews", "CNN Brasil", "BandNews"],
+    "esportes": ["SporTV", "ESPN", "Fox Sports"],
+    "filmes": ["Telecine", "HBO", "Cinemax", "TNT"],
+    "series": ["Warner", "Universal", "AXN", "Sony"],
+    "infantil": ["Discovery Kids", "Cartoon Network", "Nickelodeon"],
+    "adulto": ["Canais +18"]
+  },
+  
+  "filtros": {
+    "incluir_adultos": false,
+    "apenas_hd": false,
+    "apenas_br": true,
+    "idiomas": ["pt", "en", "es"]
+  }
+}
