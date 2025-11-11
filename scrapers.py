@@ -489,6 +489,116 @@ class BuscadorAutomatico(ScraperBase):
         
         return urls_encontradas
     
+    def buscar_em_sites_especificos(self) -> List[str]:
+        """Busca em sites específicos de IPTV fornecidos"""
+        urls_encontradas = []
+        
+        print("Buscando em sites específicos de IPTV...")
+        
+        # Lista de sites específicos fornecidos
+        sites_especificos = [
+            "https://nomadiptv.com/",
+            "https://ottocean.com/promotion/",
+            "https://iptvon.me/",
+            "https://iptvsubscription8k.com/",
+            "https://xtreamview.com/",
+            "https://digitalizard.com/",
+            "https://worthystream.com/home/",
+            "https://originetv.com/",
+            "https://zentrotv.net/",
+        ]
+        
+        for site in sites_especificos:
+            try:
+                print(f"  Processando: {site}...")
+                
+                # Buscar links M3U na página principal
+                urls_pagina = self.buscar_em_paginas_html(site)
+                urls_encontradas.extend(urls_pagina)
+                
+                if urls_pagina:
+                    print(f"    ✓ Encontrados {len(urls_pagina)} links M3U")
+                
+                # Tentar padrões comuns de URLs de playlist nesses sites
+                padroes_comuns = [
+                    f"{site}playlist.m3u",
+                    f"{site}list.m3u",
+                    f"{site}iptv.m3u",
+                    f"{site}m3u/playlist.m3u",
+                    f"{site}api/playlist.m3u",
+                    f"{site}download/playlist.m3u",
+                ]
+                
+                for padrao in padroes_comuns:
+                    conteudo = self.fazer_requisicao(padrao, silencioso=True)
+                    if conteudo and '#EXTM3U' in conteudo:
+                        urls_encontradas.append(padrao)
+                        print(f"    ✓ Encontrado playlist direto: {padrao}")
+                
+                # Buscar em páginas comuns desses sites
+                paginas_comuns = [
+                    f"{site}playlist",
+                    f"{site}download",
+                    f"{site}free",
+                    f"{site}trial",
+                    f"{site}test",
+                ]
+                
+                for pagina in paginas_comuns:
+                    urls = self.buscar_em_paginas_html(pagina)
+                    urls_encontradas.extend(urls)
+                
+            except Exception as e:
+                print(f"    ✗ Erro ao processar {site}: {str(e)[:50]}")
+                continue
+        
+        return urls_encontradas
+    
+    def remover_duplicatas(self, urls: List[str]) -> List[str]:
+        """Remove duplicatas de URLs de forma inteligente"""
+        urls_unicas = []
+        urls_vistas = set()
+        
+        for url in urls:
+            # Normalizar URL
+            url_normalizada = url.strip().rstrip('/')
+            
+            # Remover parâmetros de tracking/UTM
+            if '?' in url_normalizada:
+                partes = url_normalizada.split('?')
+                url_base = partes[0]
+                # Manter apenas se não for apenas tracking
+                if not all(param.startswith(('utm_', 'ref=', 'source=')) for param in partes[1].split('&') if '=' in param):
+                    url_normalizada = url_base
+            
+            # Verificar se já vimos esta URL ou uma variação
+            url_lower = url_normalizada.lower()
+            
+            # Verificar duplicatas exatas
+            if url_lower in urls_vistas:
+                continue
+            
+            # Verificar duplicatas por domínio e caminho (ignorando protocolo)
+            url_sem_protocolo = url_lower.replace('http://', '').replace('https://', '')
+            dominio_caminho = '/'.join(url_sem_protocolo.split('/')[:3])  # domínio + 2 níveis de caminho
+            
+            # Para URLs M3U, considerar apenas domínio + nome do arquivo
+            if '.m3u' in url_lower:
+                partes_url = url_sem_protocolo.split('/')
+                if len(partes_url) > 1:
+                    dominio = partes_url[0]
+                    arquivo = partes_url[-1]
+                    chave_duplicata = f"{dominio}/{arquivo}"
+                    
+                    if chave_duplicata in urls_vistas:
+                        continue
+                    urls_vistas.add(chave_duplicata)
+            
+            urls_vistas.add(url_lower)
+            urls_unicas.append(url_normalizada)
+        
+        return urls_unicas
+    
     def buscar_em_redes_sociais(self) -> List[str]:
         """Busca em redes sociais e plataformas de compartilhamento"""
         urls_encontradas = []
@@ -615,8 +725,15 @@ class BuscadorAutomatico(ScraperBase):
         todas_urls.extend(urls_tv)
         print(f"✓ {len(urls_tv)} fontes de canais TV encontradas\n")
         
-        # Remover duplicatas
-        todas_urls = list(set(todas_urls))
+        # 12. Buscar em sites específicos fornecidos
+        urls_especificos = self.buscar_em_sites_especificos()
+        todas_urls.extend(urls_especificos)
+        print(f"✓ {len(urls_especificos)} fontes encontradas em sites específicos\n")
+        
+        # Remover duplicatas de forma inteligente
+        print("Removendo duplicatas...")
+        todas_urls = self.remover_duplicatas(todas_urls)
+        print(f"✓ {len(todas_urls)} URLs únicas após remoção de duplicatas\n")
         
         print(f"Total de fontes únicas encontradas: {len(todas_urls)}")
         print("=" * 60)

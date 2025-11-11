@@ -96,7 +96,13 @@ Exemplos de uso:
                 print(f"  ✗ Erro: {str(e)[:50]}")
         
         gerador.adicionar_streams(todos_streams)
-        print(f"\n✓ Total de {len(todos_streams)} streams coletados")
+        
+        # Remover duplicatas de streams
+        print("\nRemovendo duplicatas de streams...")
+        total_antes = len(gerador.streams)
+        gerador.remover_duplicatas_streams()
+        total_depois = len(gerador.streams)
+        print(f"✓ {total_depois} streams únicos (removidos {total_antes - total_depois} duplicatas)")
     
     # Buscar streams de diferentes fontes
     elif args.fonte_publica:
@@ -143,6 +149,13 @@ Exemplos de uso:
                 print(f"  ✗ Erro: {str(e)[:50]}")
         
         gerador.adicionar_streams(todos_streams)
+        
+        # Remover duplicatas de streams
+        print("\nRemovendo duplicatas de streams...")
+        total_antes = len(gerador.streams)
+        gerador.remover_duplicatas_streams()
+        total_depois = len(gerador.streams)
+        print(f"✓ {total_depois} streams únicos (removidos {total_antes - total_depois} duplicatas)")
     
     # Validar URLs se solicitado
     if args.validar:

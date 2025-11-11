@@ -51,6 +51,9 @@ class GeradorM3U:
             arquivo_saida: Caminho do arquivo M3U a ser gerado
             filtro_categoria: Se especificado, filtra apenas streams desta categoria
         """
+        # Remover duplicatas antes de gerar
+        self.remover_duplicatas_streams()
+        
         streams_filtrados = self.streams
         if filtro_categoria:
             streams_filtrados = [s for s in self.streams if s.categoria == filtro_categoria]
@@ -102,3 +105,40 @@ class GeradorM3U:
             return response.status_code < 400
         except:
             return False
+    
+    def remover_duplicatas_streams(self):
+        """Remove streams duplicados baseado em URL e nome"""
+        streams_unicos = []
+        streams_vistos = set()
+        
+        for stream in self.streams:
+            # Normalizar URL
+            url_normalizada = stream.url.strip().rstrip('/')
+            
+            # Remover parâmetros de tracking
+            if '?' in url_normalizada:
+                partes = url_normalizada.split('?')
+                url_base = partes[0]
+                # Remover apenas parâmetros de tracking
+                params = partes[1].split('&') if len(partes) > 1 else []
+                params_validos = [p for p in params if not p.startswith(('utm_', 'ref=', 'source='))]
+                if params_validos:
+                    url_normalizada = f"{url_base}?{'&'.join(params_validos)}"
+                else:
+                    url_normalizada = url_base
+            
+            # Criar chave única baseada em URL e nome
+            url_lower = url_normalizada.lower()
+            nome_lower = stream.nome.lower().strip()
+            
+            # Chave única: URL normalizada + nome normalizado
+            chave_unica = f"{url_lower}|{nome_lower}"
+            
+            # Se já vimos este stream, pular
+            if chave_unica in streams_vistos:
+                continue
+            
+            streams_vistos.add(chave_unica)
+            streams_unicos.append(stream)
+        
+        self.streams = streams_unicos

@@ -6,11 +6,13 @@ Programa em Python para criar arquivos M3U (playlists de streaming) a partir de 
 
 - ✅ **BUSCA AUTOMÁTICA** - Encontra fontes M3U automaticamente na internet
 - ✅ Busca em múltiplas fontes: GitHub, sites IPTV, fóruns, redes sociais
+- ✅ **Busca em sites específicos de IPTV** (nomadiptv, ottocean, iptvon, etc.)
 - ✅ **Busca em sites privados/premium de IPTV**
 - ✅ **Busca específica por canais adultos**
 - ✅ **Busca por canais de TV/IPTV**
 - ✅ Busca usando mecanismos de busca (DuckDuckGo) - 5+ termos de busca
 - ✅ Scraping inteligente de páginas HTML
+- ✅ **Remoção inteligente de duplicatas** (URLs e streams)
 - ✅ Tratamento silencioso de erros (não mostra 404 desnecessários)
 - ✅ Suporte para múltiplas categorias (live, movie, series, adult, open, private)
 - ✅ Detecção automática melhorada de categorias (adulto, privado, TV, etc.)
